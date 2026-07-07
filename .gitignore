@@ -13,8 +13,8 @@ venv/
 env/
 
 # Model files (large binaries)
-models/
-*.h5
+# models/
+# *.h5
 *.pth
 *.onnx
 
