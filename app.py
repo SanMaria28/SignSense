@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +28,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR       = Path(__file__).parent.parent
+BASE_DIR       = Path(__file__).parent
 MODELS_DIR     = BASE_DIR / "models"
 CLASS_MAP_PATH = MODELS_DIR / "class_map.json"
 SUMMARY_PATH   = MODELS_DIR / "training_summary.json"
