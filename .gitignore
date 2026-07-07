@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Environments
+.env
+*.env
+venv/
+.venv/
+env/
+
+# Model files (large binaries)
+models/
+*.h5
+*.pth
+*.onnx
+
+# Dataset extraction
+tmp_*/
+extracted_*/
+
+# Gradio cache
+gradio_cached_examples/
+.gradio/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
