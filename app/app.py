@@ -592,8 +592,5 @@ def build_ui():
     return demo
 
 if __name__ == "__main__":
-    import os
     demo = build_ui()
-    # Render assigns a dynamic port via the PORT environment variable
-    port = int(os.environ.get("PORT", 7860))
-    demo.launch(server_name="0.0.0.0", server_port=port, share=False)
+    demo.launch(share=False, inbrowser=True)
