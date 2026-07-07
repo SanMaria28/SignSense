@@ -1,4 +1,4 @@
-# 🚦 SignSense: Indian Traffic Sign Assistant
+# 🚦 SignSense: Indian Traffic Sign Learning Assistant
 
 An end-to-end ML web application that identifies Indian traffic signs and delivers highly structured educational content in multiple regional languages. 
 
