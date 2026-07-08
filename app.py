@@ -252,17 +252,30 @@ def predict_sign(pil_image, language="English"):
     return sign_name, markdown_response, sign_name
 
 # ── Chatbot function ──────────────────────────────────────────────────────────
-def chat_with_llm(user_message, history, current_sign):
-    if not user_message.strip():
-        return history, ""
-    
+def chat_with_llm(user_message, audio_file, history, current_sign):
     if history is None:
         history = []
+        
+    # Handle Audio Transcription if audio_file is provided
+    if audio_file is not None:
+        try:
+            with open(audio_file, "rb") as file:
+                transcription = groq_client.audio.transcriptions.create(
+                    file=(audio_file, file.read()),
+                    model="whisper-large-v3-turbo",
+                )
+            user_message = transcription.text
+        except Exception as exc:
+            log.error(f"Whisper failed: {exc}")
+            user_message = "⚠️ Audio transcription failed."
+
+    if not user_message or not user_message.strip():
+        return history, "", None
         
     if groq_client is None:
         history.append({"role": "user", "content": user_message})
         history.append({"role": "assistant", "content": "⚠️ Groq API key is not configured."})
-        return history, ""
+        return history, "", None
 
     context = f"The user is asking about traffic signs. The currently identified sign on the screen is '{current_sign}'. " if current_sign and current_sign != "Unknown" else "The user is asking about Indian traffic signs."
     
@@ -288,9 +301,9 @@ def chat_with_llm(user_message, history, current_sign):
     except Exception as exc:
         log.error(f"Chat LLM error: {exc}")
         history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": f"⚠️ Error: {exc}"})
+        history.append({"role": "assistant", "content": f"⚠️ API Error: {exc}"})
         
-    return history, ""
+    return history, "", None
 
 # ── Gradio UI ─────────────────────────────────────────────────────────────────
 _APP_CSS = """
@@ -559,6 +572,12 @@ def build_ui():
                                 scale=4
                             )
                             chat_submit = gr.Button("Send", variant="primary", scale=1)
+                        with gr.Row():
+                            audio_input = gr.Audio(
+                                sources=["microphone"],
+                                type="filepath",
+                                label="Or ask your question using Voice",
+                            )
 
         # Event listeners for Prediction
         predict_btn.click(
@@ -580,13 +599,18 @@ def build_ui():
         # Event listeners for Chat
         chat_input.submit(
             fn=chat_with_llm,
-            inputs=[chat_input, chatbot, current_sign_state],
-            outputs=[chatbot, chat_input]
+            inputs=[chat_input, audio_input, chatbot, current_sign_state],
+            outputs=[chatbot, chat_input, audio_input]
         )
         chat_submit.click(
             fn=chat_with_llm,
-            inputs=[chat_input, chatbot, current_sign_state],
-            outputs=[chatbot, chat_input]
+            inputs=[chat_input, audio_input, chatbot, current_sign_state],
+            outputs=[chatbot, chat_input, audio_input]
+        )
+        audio_input.stop_recording(
+            fn=chat_with_llm,
+            inputs=[chat_input, audio_input, chatbot, current_sign_state],
+            outputs=[chatbot, chat_input, audio_input]
         )
 
     return demo
