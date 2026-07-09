@@ -252,30 +252,12 @@ def predict_sign(pil_image, language="English"):
     return sign_name, markdown_response, sign_name
 
 # ── Chatbot function ──────────────────────────────────────────────────────────
-def chat_with_llm(user_message, audio_file, history, current_sign):
-    if history is None:
-        history = []
-        
-    # Handle Audio Transcription if audio_file is provided
-    if audio_file is not None:
-        try:
-            with open(audio_file, "rb") as file:
-                transcription = groq_client.audio.transcriptions.create(
-                    file=(audio_file, file.read()),
-                    model="whisper-large-v3-turbo",
-                )
-            user_message = transcription.text
-        except Exception as exc:
-            log.error(f"Whisper failed: {exc}")
-            user_message = "⚠️ Audio transcription failed."
-
+def get_chat_response(user_message, current_sign, history):
     if not user_message or not user_message.strip():
-        return history, "", None
+        return "Please enter a message."
         
     if groq_client is None:
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": "⚠️ Groq API key is not configured."})
-        return history, "", None
+        return "⚠️ Groq API key is not configured."
 
     context = f"The user is asking about traffic signs. The currently identified sign on the screen is '{current_sign}'. " if current_sign and current_sign != "Unknown" else "The user is asking about Indian traffic signs."
     
@@ -295,68 +277,41 @@ def chat_with_llm(user_message, audio_file, history, current_sign):
             temperature=0.7,
             max_tokens=500,
         )
-        reply = resp.choices[0].message.content
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": reply})
+        return resp.choices[0].message.content
     except Exception as exc:
         log.error(f"Chat LLM error: {exc}")
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": f"⚠️ API Error: {exc}"})
-        
-    return history, "", None
+        return f"⚠️ API Error: {exc}"
 
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
-_APP_CSS = """
+# ── Streamlit UI ─────────────────────────────────────────────────────────────────
+def build_ui():
+    import streamlit as st
+
+    # --- Page Config & CSS ---
+    st.set_page_config(page_title="SignSense", page_icon="🚦", layout="wide")
+    
+    st.markdown("""
+    <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
     
     :root {
-        --clr-bg:       #0d1117;
-        --clr-surface:  rgba(22, 27, 34, 0.7);
-        --clr-card:     rgba(28, 35, 48, 0.6);
-        --clr-border:   rgba(48, 54, 61, 0.5);
         --clr-accent1:  #f97316;
         --clr-accent2:  #3b82f6;
-        --clr-green:    #22c55e;
-        --clr-text:     #e6edf3;
-        --clr-muted:    #8b949e;
-        --radius:       16px;
-        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        --glass-border: 1px solid rgba(255, 255, 255, 0.08);
     }
     
-    body, .gradio-container {
-        background: linear-gradient(135deg, #0d1117 0%, #0a0a0f 50%, #111424 100%) !important;
-        background-attachment: fixed !important;
-        color: var(--clr-text) !important;
+    body {
         font-family: 'Inter', system-ui, sans-serif !important;
-    }
-    
-    /* Glassmorphism Containers */
-    .glass-panel {
-        background: var(--clr-surface) !important;
-        backdrop-filter: blur(12px) !important;
-        -webkit-backdrop-filter: blur(12px) !important;
-        border: var(--glass-border) !important;
-        box-shadow: var(--glass-shadow) !important;
-        border-radius: var(--radius) !important;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    .glass-panel:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45) !important;
     }
     
     #hero-banner {
         background: linear-gradient(135deg, rgba(26,10,0,0.8) 0%, rgba(13,17,23,0.8) 40%, rgba(0,16,58,0.8) 100%);
         backdrop-filter: blur(16px);
-        border: var(--glass-border);
-        box-shadow: var(--glass-shadow);
-        border-radius: var(--radius);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        border-radius: 16px;
         padding: 2.2rem 2rem;
         text-align: center;
         margin-bottom: 2rem;
-        animation: fadeInDown 0.8s ease-out;
+        color: #e6edf3;
     }
     
     #hero-title {
@@ -367,46 +322,6 @@ _APP_CSS = """
         -webkit-text-fill-color: transparent;
         background-clip: text;
         margin: 0 0 0.75rem;
-        animation: pulseGradient 6s infinite alternate;
-    }
-    
-    #hero-subtitle { color: var(--clr-muted); font-size: 1.1rem; margin: 0; line-height: 1.6; }
-    
-    #predict-btn {
-        background: linear-gradient(135deg, var(--clr-accent1), #ea6c00) !important;
-        border: none !important; border-radius: 12px !important; color: white !important;
-        font-weight: 700 !important; font-size: 1.1rem !important; padding: 0.85rem 2rem !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4) !important;
-    }
-    
-    #predict-btn:hover { 
-        transform: translateY(-2px) scale(1.02) !important;
-        box-shadow: 0 8px 25px rgba(249, 115, 22, 0.6) !important; 
-    }
-    
-    #predict-btn:active {
-        transform: translateY(1px) scale(0.98) !important;
-    }
-    
-    #pred-label textarea, #pred-label input {
-        background: rgba(22, 27, 34, 0.5) !important;
-        backdrop-filter: blur(8px) !important;
-        border: 1px solid rgba(34, 197, 94, 0.3) !important;
-        border-radius: 12px !important; color: #22c55e !important; font-size: 1.15rem !important;
-        font-weight: 700 !important;
-        text-align: center !important;
-        box-shadow: inset 0 2px 10px rgba(0,0,0,0.2) !important;
-    }
-    
-    #groq-output, #chat-container {
-        background: rgba(28, 35, 48, 0.4); 
-        backdrop-filter: blur(10px);
-        border: var(--glass-border);
-        border-radius: var(--radius); 
-        padding: 1.5rem; 
-        line-height: 1.75;
-        animation: fadeInUp 0.6s ease-out backwards;
     }
     
     .status-pill {
@@ -414,36 +329,8 @@ _APP_CSS = """
         font-weight: 600; background: rgba(59,130,246,0.15); color: var(--clr-accent2);
         border: 1px solid rgba(59,130,246,0.3);
         backdrop-filter: blur(4px);
-        transition: transform 0.2s ease;
     }
-    .status-pill:hover { transform: scale(1.05); }
-    .status-pill.green { background: rgba(34,197,94,0.15); color: var(--clr-green); border-color: rgba(34,197,94,0.3); }
-    
-    .section-label {
-        font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px;
-        text-transform: uppercase; color: var(--clr-muted); margin-bottom: 0.75rem;
-        display: flex; align-items: center; gap: 8px;
-    }
-    
-    /* Animations */
-    @keyframes fadeInDown {
-        from { opacity: 0; transform: translateY(-20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes pulseGradient {
-        0% { filter: hue-rotate(0deg); }
-        100% { filter: hue-rotate(15deg); }
-    }
-    
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+    .status-pill.green { background: rgba(34,197,94,0.15); color: #22c55e; border-color: rgba(34,197,94,0.3); }
 
     /* Animated CSS Traffic Light */
     .traffic-light {
@@ -490,131 +377,126 @@ _APP_CSS = """
         0%, 66% { background: #333; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6); }
         67%, 100% { background: #22c55e; box-shadow: 0 0 10px #22c55e, inset 0 1px 2px rgba(255,255,255,0.5); }
     }
-"""
+    </style>
+    """, unsafe_allow_html=True)
 
-def build_ui():
-    import gradio as gr
+    # --- Session State ---
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "current_sign" not in st.session_state:
+        st.session_state.current_sign = "Unknown"
+    if "groq_output" not in st.session_state:
+        st.session_state.groq_output = "Upload a traffic sign image and click **Analyse Sign** to receive a detailed breakdown."
 
+    # --- Header ---
     vision_ok = "Vision AI Active" if groq_client else "Vision AI Offline"
-    cnn_ok    = "CNN Loaded" if cnn_model else "CNN Not Loaded"
-
-    with gr.Blocks(title="SignSense", theme=gr.themes.Base()) as demo:
-        demo.load(None, js="() => { document.head.insertAdjacentHTML('beforeend', `<style>" + _APP_CSS.replace("`", "\\`") + "</style>`) }")
-        
-        # State to keep track of the current identified sign for the chatbot context
-        current_sign_state = gr.State("Unknown")
-
-        gr.HTML(f"""
-        <div id="hero-banner">
-            <h1 id="hero-title">
-                <div class="traffic-light">
-                    <div class="light red"></div>
-                    <div class="light yellow"></div>
-                    <div class="light green"></div>
-                </div>
-                SignSense
-            </h1>
-            <p id="hero-subtitle">
-                Upload any Indian traffic sign — Vision AI identifies it instantly. <br/>
-                Get detailed driving rules, legal implications, and ask follow-up questions in the chat!
-            </p>
-            <div style="margin-top:1.5rem; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-                <span class="status-pill green">{vision_ok}</span>
-                <span class="status-pill">{cnn_ok}</span>
+    cnn_ok = "CNN Loaded" if cnn_model else "CNN Not Loaded"
+    
+    st.markdown(f"""
+    <div id="hero-banner">
+        <h1 id="hero-title">
+            <div class="traffic-light">
+                <div class="light red"></div>
+                <div class="light yellow"></div>
+                <div class="light green"></div>
             </div>
+            SignSense
+        </h1>
+        <p style="color: #8b949e; font-size: 1.1rem; margin: 0; line-height: 1.6;">
+            Upload any Indian traffic sign — Vision AI identifies it instantly. <br/>
+            Get detailed driving rules, legal implications, and ask follow-up questions in the chat!
+        </p>
+        <div style="margin-top:1.5rem; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+            <span class="status-pill {'green' if groq_client else ''}">{vision_ok}</span>
+            <span class="status-pill {'green' if cnn_model else ''}">{cnn_ok}</span>
         </div>
-        """)
+    </div>
+    """, unsafe_allow_html=True)
 
-        with gr.Row(equal_height=False):
-            # Left Column (Input & Prediction)
-            with gr.Column(scale=1, min_width=320, elem_classes="glass-panel", elem_id="left-col"):
-                gr.HTML('<div style="padding: 1rem;"><p class="section-label">Upload Sign</p></div>')
-                image_input = gr.Image(type="pil", height=280, show_label=False)
+    # --- Layout ---
+    col1, col2 = st.columns([1, 1.2], gap="large")
+
+    with col1:
+        st.markdown("<p style='font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #8b949e;'>Upload Sign</p>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+        
+        lang = st.selectbox("Output Language", 
+                           ["English", "Hindi", "Bengali", "Telugu", "Marathi", "Tamil", "Urdu", "Gujarati", "Kannada", "Odia", "Malayalam"], 
+                           index=0, help="Choose the language for rules and guidelines.")
+        
+        st.markdown("<p style='font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #8b949e; margin-top: 1rem;'>Identified Sign</p>", unsafe_allow_html=True)
+        st.info(f"**{st.session_state.current_sign}**", icon="ℹ️")
+        
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            if st.button("Analyse Sign", type="primary", use_container_width=True):
+                if uploaded_file is not None:
+                    with st.spinner("Analysing sign..."):
+                        pil_image = Image.open(uploaded_file)
+                        sign_name, explanation, _ = predict_sign(pil_image, lang)
+                        st.session_state.current_sign = sign_name
+                        st.session_state.groq_output = explanation
+                        st.rerun()
+                else:
+                    st.warning("Please upload an image first.")
+        with c2:
+            if st.button("Clear", use_container_width=True):
+                st.session_state.current_sign = "Unknown"
+                st.session_state.groq_output = "Upload a traffic sign image and click **Analyse Sign** to receive a detailed breakdown."
+                st.session_state.chat_history = []
+                st.rerun()
+
+    with col2:
+        tab1, tab2 = st.tabs(["AI Learning Guide", "Ask Questions"])
+        
+        with tab1:
+            st.markdown(st.session_state.groq_output)
+            
+        with tab2:
+            st.markdown("### Chat with SignSense")
+            
+            # Display chat messages
+            chat_container = st.container(height=400)
+            with chat_container:
+                for message in st.session_state.chat_history:
+                    with st.chat_message(message["role"]):
+                        st.markdown(message["content"])
+            
+            # Voice Input
+            audio_val = st.audio_input("Or ask your question using Voice")
+            
+            # Text Input
+            if prompt := st.chat_input("Ask me anything about Indian traffic rules, fines, or driving advice..."):
+                process_chat(prompt)
                 
-                lang_dropdown = gr.Dropdown(
-                    choices=["English", "Hindi", "Bengali", "Telugu", "Marathi", "Tamil", "Urdu", "Gujarati", "Kannada", "Odia", "Malayalam"],
-                    value="English",
-                    label="Output Language",
-                    info="Choose the language for rules and guidelines."
-                )
+            if audio_val is not None:
+                # Need to check if this specific audio has been processed to avoid re-triggering
+                if "last_audio" not in st.session_state or st.session_state.last_audio != audio_val:
+                    st.session_state.last_audio = audio_val
+                    with st.spinner("Transcribing..."):
+                        try:
+                            # Save temporary file
+                            with open("temp_audio.wav", "wb") as f:
+                                f.write(audio_val.getbuffer())
+                            
+                            with open("temp_audio.wav", "rb") as file:
+                                transcription = groq_client.audio.transcriptions.create(
+                                    file=("temp_audio.wav", file.read()),
+                                    model="whisper-large-v3-turbo",
+                                )
+                            process_chat(transcription.text)
+                        except Exception as exc:
+                            log.error(f"Whisper failed: {exc}")
+                            st.error("Audio transcription failed.")
 
-                gr.HTML('<div style="padding: 1rem 1rem 0;"><p class="section-label">Identified Sign</p></div>')
-                pred_label = gr.Textbox(
-                    placeholder="Sign name will appear here…",
-                    interactive=False,
-                    elem_id="pred-label",
-                    show_label=False,
-                )
-
-                with gr.Row(elem_classes="glass-panel", elem_id="btn-row"):
-                    predict_btn = gr.Button("Analyse Sign", variant="primary", elem_id="predict-btn", scale=3)
-                    clear_btn   = gr.Button("Clear", scale=1)
-
-            # Right Column (Tabs for Guide and Chat)
-            with gr.Column(scale=1, elem_classes="glass-panel"):
-                with gr.Tabs():
-                    with gr.TabItem("AI Learning Guide"):
-                        groq_output = gr.Markdown(
-                            value="Upload a traffic sign image and click **Analyse Sign** to receive a detailed breakdown.",
-                            elem_id="groq-output",
-                        )
-                    
-                    with gr.TabItem("Ask Questions"):
-                        chatbot = gr.Chatbot(
-                            elem_id="chat-container", 
-                            height=400,
-                            placeholder="Ask me anything about Indian traffic rules, fines, or driving advice..."
-                        )
-                        with gr.Row():
-                            chat_input = gr.Textbox(
-                                placeholder="Type your question here and press Enter...",
-                                show_label=False,
-                                scale=4
-                            )
-                            chat_submit = gr.Button("Send", variant="primary", scale=1)
-                        with gr.Row():
-                            audio_input = gr.Audio(
-                                sources=["microphone"],
-                                type="filepath",
-                                label="Or ask your question using Voice",
-                            )
-
-        # Event listeners for Prediction
-        predict_btn.click(
-            fn=predict_sign,
-            inputs=[image_input, lang_dropdown],
-            outputs=[pred_label, groq_output, current_sign_state]
-        )
-        image_input.upload(
-            fn=predict_sign, 
-            inputs=[image_input, lang_dropdown],
-            outputs=[pred_label, groq_output, current_sign_state]
-        )
-        clear_btn.click(
-            fn=lambda: (None, "", "Upload a traffic sign image and click **Analyse Sign** to receive a detailed breakdown.", "Unknown", "English", []),
-            inputs=None,
-            outputs=[image_input, pred_label, groq_output, current_sign_state, lang_dropdown, chatbot],
-        )
-
-        # Event listeners for Chat
-        chat_input.submit(
-            fn=chat_with_llm,
-            inputs=[chat_input, audio_input, chatbot, current_sign_state],
-            outputs=[chatbot, chat_input, audio_input]
-        )
-        chat_submit.click(
-            fn=chat_with_llm,
-            inputs=[chat_input, audio_input, chatbot, current_sign_state],
-            outputs=[chatbot, chat_input, audio_input]
-        )
-        audio_input.stop_recording(
-            fn=chat_with_llm,
-            inputs=[chat_input, audio_input, chatbot, current_sign_state],
-            outputs=[chatbot, chat_input, audio_input]
-        )
-
-    return demo
+def process_chat(user_msg):
+    import streamlit as st
+    st.session_state.chat_history.append({"role": "user", "content": user_msg})
+    
+    with st.spinner("Thinking..."):
+        reply = get_chat_response(user_msg, st.session_state.current_sign, st.session_state.chat_history[:-1])
+        st.session_state.chat_history.append({"role": "assistant", "content": reply})
+    st.rerun()
 
 if __name__ == "__main__":
-    demo = build_ui()
-    demo.launch(share=False, inbrowser=True)
+    build_ui()
