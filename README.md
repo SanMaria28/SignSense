@@ -87,4 +87,4 @@ The Streamlit app will open automatically at **http://localhost:8501**.
 
 ## 📄 License
 
-For educational use. Dataset originally sourced from the **Indian Traffic Sign Dataset** on Kaggle.
+For educational use. Dataset originally sourced from the [**Indian Traffic Sign Dataset**](https://www.kaggle.com/datasets/neelpratiksha/indian-traffic-sign-dataset) on Kaggle.
