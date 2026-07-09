@@ -45,49 +45,32 @@ if SUMMARY_PATH.exists():
     IMG_SIZE   = _summary.get("image_size", IMG_SIZE)
     PREPROCESS = _summary.get("preprocessing", PREPROCESS)
 
-# ── Load CNN model ────────────────────────────────────────────────────────────
-def load_keras_model():
+# ── Load TFLite model ─────────────────────────────────────────────────────────
+def load_tflite_model():
     try:
-        import tensorflow as tf
+        import tflite_runtime.interpreter as tflite
     except ImportError:
-        log.error("tensorflow not installed.")
+        try:
+            import tensorflow.lite as tflite
+        except ImportError:
+            log.error("tflite_runtime or tensorflow not installed.")
+            return None
+
+    path = MODELS_DIR / "traffic_model.tflite"
+    if not path.exists():
+        log.error(f"TFLite model not found at {path}")
         return None
 
     try:
-        _orig = tf.keras.layers.Dense.from_config
-        @classmethod
-        def _patched(cls, config):
-            config.pop("quantization_config", None)
-            if isinstance(config.get("config"), dict):
-                config["config"].pop("quantization_config", None)
-            return _orig(config)
-        tf.keras.layers.Dense.from_config = _patched
-    except Exception:
-        pass
-
-    class CompatDense(tf.keras.layers.Dense):
-        @classmethod
-        def from_config(cls, config):
-            config.pop("quantization_config", None)
-            if isinstance(config.get("config"), dict):
-                config["config"].pop("quantization_config", None)
-            return super().from_config(config)
-
-    for path in [
-        MODELS_DIR / "traffic_model.h5",
-        MODELS_DIR / "traffic_model.keras",
-        MODELS_DIR / "best_checkpoint.h5",
-        MODELS_DIR / "traffic_classifier_model.h5",
-    ]:
-        if not path.exists():
-            continue
-        try:
-            m = tf.keras.models.load_model(str(path), custom_objects={"Dense": CompatDense})
-            log.info(f"CNN loaded: {path.name}  input={m.input_shape}  classes={m.output_shape[-1]}")
-            return m
-        except Exception as exc:
-            log.error(f"Failed to load {path.name}: {exc}")
-    return None
+        interpreter = tflite.Interpreter(model_path=str(path))
+        interpreter.allocate_tensors()
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        log.info(f"TFLite loaded: {path.name}  input={input_details[0]['shape']}  classes={output_details[0]['shape'][-1]}")
+        return interpreter
+    except Exception as exc:
+        log.error(f"Failed to load {path.name}: {exc}")
+        return None
 
 def load_class_map() -> dict[str, str]:
     if not CLASS_MAP_PATH.exists():
@@ -95,7 +78,7 @@ def load_class_map() -> dict[str, str]:
     with open(CLASS_MAP_PATH, encoding="utf-8") as f:
         return json.load(f)
 
-cnn_model = load_keras_model()
+cnn_model = load_tflite_model()
 class_map  = load_class_map()
 ALL_CLASSES = list(class_map.values())
 
@@ -135,17 +118,26 @@ def cnn_top3(pil_image: Image.Image) -> list[tuple[str, float]]:
     if cnn_model is None:
         return []
     try:
-        import tensorflow as tf
-        h, w = cnn_model.input_shape[1], cnn_model.input_shape[2]
+        input_details = cnn_model.get_input_details()[0]
+        output_details = cnn_model.get_output_details()[0]
+        
+        h, w = input_details['shape'][1], input_details['shape'][2]
         img  = composite_on_white(pil_image).convert("RGB").resize((w, h))
         arr  = np.array(img, dtype=np.float32)
-        is_gtsrb = cnn_model.output_shape[-1] == 43
+        
+        is_gtsrb = output_details['shape'][-1] == 43
         if PREPROCESS == "mobilenet_v2" and not is_gtsrb:
-            arr = tf.keras.applications.mobilenet_v2.preprocess_input(arr)
+            # mobilenet_v2 preprocess_input manually
+            arr = (arr / 127.5) - 1.0
         else:
             arr = arr / 255.0
-        arr   = np.expand_dims(arr, 0)
-        preds = cnn_model.predict(arr, verbose=0)[0]
+            
+        arr = np.expand_dims(arr, 0)
+        
+        cnn_model.set_tensor(input_details['index'], arr)
+        cnn_model.invoke()
+        preds = cnn_model.get_tensor(output_details['index'])[0]
+        
         top3  = np.argsort(preds)[::-1][:3]
         return [(class_map.get(str(i), f"class_{i}"), float(preds[i]) * 100) for i in top3]
     except Exception as exc:

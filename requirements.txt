@@ -1,5 +1,6 @@
 # Core ML & data
-tensorflow-cpu
+tflite-runtime; sys_platform == 'linux'
+tensorflow-cpu; sys_platform == 'win32'
 numpy<2.0.0
 opencv-python-headless
 
