@@ -1,5 +1,5 @@
 # Core ML & data
-tensorflow-cpu
+tensorflow
 numpy>=1.24.0
 opencv-python-headless
 

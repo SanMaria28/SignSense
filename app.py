@@ -432,7 +432,8 @@ def build_ui():
             if st.button("Analyse Sign", type="primary", use_container_width=True):
                 if uploaded_file is not None:
                     with st.spinner("Analysing sign..."):
-                        pil_image = Image.open(uploaded_file)
+                        import io
+                        pil_image = Image.open(io.BytesIO(uploaded_file.getvalue()))
                         sign_name, explanation, _ = predict_sign(pil_image, lang)
                         st.session_state.current_sign = sign_name
                         st.session_state.groq_output = explanation
