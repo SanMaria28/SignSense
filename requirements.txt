@@ -1,16 +1,16 @@
 # Core ML & data
-tensorflow
-numpy>=1.24.0
+tensorflow-cpu
+numpy<2.0.0
 opencv-python-headless
 
 # Groq (LLM API)
-groq==0.11.0
+groq
 
 # Web UI
-streamlit>=1.39.0
-pillow==10.4.0
+streamlit
+pillow
 
 # Environment variables
-python-dotenv==1.0.1
+python-dotenv
 
 rich
