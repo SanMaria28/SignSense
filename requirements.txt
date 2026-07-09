@@ -1,6 +1,5 @@
 # Core ML & data
-tflite-runtime; sys_platform == 'linux'
-tensorflow-cpu; sys_platform == 'win32'
+ai-edge-litert
 numpy<2.0.0
 opencv-python-headless
 

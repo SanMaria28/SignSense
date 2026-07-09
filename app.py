@@ -48,13 +48,16 @@ if SUMMARY_PATH.exists():
 # ── Load TFLite model ─────────────────────────────────────────────────────────
 def load_tflite_model():
     try:
-        import tflite_runtime.interpreter as tflite
+        import ai_edge_litert.interpreter as tflite
     except ImportError:
         try:
-            import tensorflow.lite as tflite
+            import tflite_runtime.interpreter as tflite
         except ImportError:
-            log.error("tflite_runtime or tensorflow not installed.")
-            return None
+            try:
+                import tensorflow.lite as tflite
+            except ImportError:
+                log.error("ai_edge_litert or tflite_runtime or tensorflow not installed.")
+                return None
 
     path = MODELS_DIR / "traffic_model.tflite"
     if not path.exists():
