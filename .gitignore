@@ -34,3 +34,6 @@ gradio_cached_examples/
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary Audio
+*.wav

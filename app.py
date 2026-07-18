@@ -7,6 +7,7 @@ Run:
 
 import os
 import io
+import re
 import json
 import base64
 import logging
@@ -181,12 +182,13 @@ def vision_identify_and_explain(b64_image: str, cnn_hints: list[tuple[str, float
     ]
 
     resp = groq_client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        model="qwen/qwen3.6-27b",
         messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_content}],
         temperature=0.1,
-        max_tokens=900,
+        max_tokens=4096,
     )
     raw = resp.choices[0].message.content.strip()
+    raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
 
     sign_name = cnn_hints[0][0] if cnn_hints else "Unknown"
     explanation = raw
@@ -217,11 +219,8 @@ def predict_sign(pil_image, language="English"):
 
     t0 = time.time()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        cnn_future = pool.submit(cnn_top3, pil_image)
-        b64_future = pool.submit(pil_to_base64, pil_image)
-        top3  = cnn_future.result()
-        b64   = b64_future.result()
+    top3 = cnn_top3(pil_image)
+    b64 = pil_to_base64(pil_image)
 
     if top3:
         log.info(f"CNN top-1: {top3[0][0]} [{top3[0][1]:.1f}%]  ({time.time()-t0:.2f}s)")
