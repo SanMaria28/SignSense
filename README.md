@@ -4,7 +4,7 @@
 
 An end-to-end ML web application that identifies Indian traffic signs and delivers highly structured educational content in multiple regional languages. 
 
-SignSense uses a **Hybrid CNN + Vision LLM pipeline**: A lightweight CNN (TensorFlow Lite) provides real-time prediction hints, and a Groq-powered Vision LLM (Llama Scout) performs the final robust classification and generates contextual legal advice based on the Indian Motor Vehicles Act.
+SignSense uses a **Hybrid CNN + Vision LLM pipeline**: A lightweight CNN (TensorFlow Lite) provides real-time prediction hints, and a Groq-powered Vision LLM (Qwen) performs the final robust classification and generates contextual legal advice based on the Indian Motor Vehicles Act.
 
 ---
 
