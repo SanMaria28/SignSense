@@ -210,6 +210,7 @@ def vision_identify_and_explain(b64_image: str, cnn_hints: list[tuple[str, float
                 sign_name = raw_name
 
     log.info(f"Vision LLM identified: {sign_name!r}")
+    explanation = explanation.replace('<br>', '\n').replace('<br/>', '\n')
     return sign_name, explanation
 
 # ── Main prediction function ──────────────────────────────────────────────────
@@ -266,7 +267,7 @@ def get_chat_response(user_message, current_sign, history):
 
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=messages,
             temperature=0.7,
             max_tokens=500,
