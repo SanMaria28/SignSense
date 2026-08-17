@@ -89,14 +89,26 @@ class_map  = load_class_map()
 ALL_CLASSES = list(class_map.values())
 
 # ── Groq client ───────────────────────────────────────────────────────────────
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-if not GROQ_API_KEY:
+def find_groq_api_key():
+    import os
+    if os.getenv("GROQ_API_KEY"):
+        return os.environ["GROQ_API_KEY"]
     try:
         import streamlit as st
-        GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
+        if "GROQ_API_KEY" in st.secrets:
+            return st.secrets["GROQ_API_KEY"]
+        for k, v in st.secrets.items():
+            if k.upper() == "GROQ_API_KEY" and isinstance(v, str):
+                return v
+            if k.upper() == "GROQ" and hasattr(v, "get"):
+                for sub_k, sub_v in v.items():
+                    if sub_k.upper() == "API_KEY" and isinstance(sub_v, str):
+                        return sub_v
     except Exception:
         pass
+    return ""
 
+GROQ_API_KEY = find_groq_api_key()
 groq_client  = None
 
 if GROQ_API_KEY:
