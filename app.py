@@ -90,6 +90,13 @@ ALL_CLASSES = list(class_map.values())
 
 # ── Groq client ───────────────────────────────────────────────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+if not GROQ_API_KEY:
+    try:
+        import streamlit as st
+        GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
+    except Exception:
+        pass
+
 groq_client  = None
 
 if GROQ_API_KEY:
