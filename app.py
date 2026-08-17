@@ -385,21 +385,6 @@ def build_ui():
     if "groq_output" not in st.session_state:
         st.session_state.groq_output = "Upload a traffic sign image and click **Analyse Sign** to receive a detailed breakdown."
 
-    with st.sidebar:
-        st.markdown("### ⚙️ Settings")
-        api_key_input = st.text_input("Groq API Key", type="password", placeholder="Paste your Groq API key here...", help="Get your key at https://console.groq.com/keys")
-        if api_key_input:
-            os.environ["GROQ_API_KEY"] = api_key_input
-            global groq_client
-            try:
-                from groq import Groq
-                import httpx
-                groq_client = Groq(api_key=api_key_input, http_client=httpx.Client(verify=False))
-            except Exception:
-                pass
-        elif not os.getenv("GROQ_API_KEY"):
-            st.warning("⚠️ Please enter your Groq API Key to enable AI features.")
-
     # --- Header ---
     vision_ok = "Vision AI Active" if groq_client else "Vision AI Offline"
     cnn_ok = "CNN Loaded" if cnn_model else "CNN Not Loaded"
