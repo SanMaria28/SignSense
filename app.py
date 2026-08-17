@@ -17,9 +17,11 @@ import time
 import concurrent.futures
 import numpy as np
 from PIL import Image
-from dotenv import load_dotenv
-
-load_dotenv(dotenv_path=Path(__file__).parent / ".env")
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=Path(__file__).parent / ".env")
+except ImportError:
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
