@@ -73,13 +73,24 @@ The Streamlit app will open automatically at **http://localhost:8501**.
 4. Read the detailed Groq AI educational breakdown (Overview, Core Rules, Defensive Driving, Legal Implications).
 5. Use the chat interface to ask questions about the detected sign!
 
+### 4. Cloud Deployment (Streamlit)
+
+When deploying to **Streamlit Community Cloud**, your local `.env` file will not be uploaded. You must configure your API key in the cloud dashboard:
+1. Deploy your app on [Streamlit Cloud](https://share.streamlit.io/).
+2. In the bottom right corner (or top right menu), click **⋮ > Settings > Secrets**.
+3. Add your API key in TOML format:
+   ```toml
+   GROQ_API_KEY = "gsk_your_api_key_here"
+   ```
+4. Click **Save**. The app will reboot and the Vision AI will be active.
+
 ---
 
 ## 🔧 Requirements
 
-- Python 3.9+
+- Python 3.11 (Recommended for Streamlit Cloud compatibility)
 - Streamlit
-- AI Edge LiteRT (TensorFlow Lite runtime)
+- TFLite-Runtime (TensorFlow Lite runtime)
 - Groq Python SDK
 - Pillow, NumPy, python-dotenv
 
